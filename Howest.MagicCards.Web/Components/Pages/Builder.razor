@@ -1,0 +1,433 @@
+@page "/"
+
+@rendermode InteractiveServer
+
+<PageTitle>Builder</PageTitle>
+
+
+<div id="builder-container">
+    <div id="cards-overview">
+        <div id="builder-options">
+            <form onsubmit="ShowAllCards">
+                <div class="input-group">
+                    <input type="text" placeholder="Card name" @bind="Name" />
+                    <button @onclick="SortCards">
+                    @if(SortOrder == "asc")
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sort-alpha-down" viewBox="0 0 16 16">
+                          <path fill-rule="evenodd" d="M10.082 5.629 9.664 7H8.598l1.789-5.332h1.234L13.402 7h-1.12l-.419-1.371zm1.57-.785L11 2.687h-.047l-.652 2.157z"/>
+                          <path d="M12.96 14H9.028v-.691l2.579-3.72v-.054H9.098v-.867h3.785v.691l-2.567 3.72v.054h2.645zM4.5 2.5a.5.5 0 0 0-1 0v9.793l-1.146-1.147a.5.5 0 0 0-.708.708l2 1.999.007.007a.497.497 0 0 0 .7-.006l2-2a.5.5 0 0 0-.707-.708L4.5 12.293z"/>
+                        </svg>
+                    }
+                    else
+                    {
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-sort-alpha-down-alt" viewBox="0 0 16 16">
+                          <path d="M12.96 7H9.028v-.691l2.579-3.72v-.054H9.098v-.867h3.785v.691l-2.567 3.72v.054h2.645z"/>
+                          <path fill-rule="evenodd" d="M10.082 12.629 9.664 14H8.598l1.789-5.332h1.234L13.402 14h-1.12l-.419-1.371zm1.57-.785L11 9.688h-.047l-.652 2.156z"/>
+                          <path d="M4.5 2.5a.5.5 0 0 0-1 0v9.793l-1.146-1.147a.5.5 0 0 0-.708.708l2 1.999.007.007a.497.497 0 0 0 .7-.006l2-2a.5.5 0 0 0-.707-.708L4.5 12.293z"/>
+                        </svg>
+                    }
+                    </button>
+                </div>
+                <input type="text" placeholder="Card text" @bind="Text" />
+                <input type="text" placeholder="Card type" @bind="Type" />
+                <select id="sets" @bind="SetCode">
+                    <option value="all">All Sets</option>
+                    @if (_sets == null)
+                    {
+                        <option>Loading...</option>
+                    }
+                    else
+                    {
+                        @foreach (var set in _sets)
+                        {
+                            <option value="@set.Code">@set.Name</option>
+                        }
+                    }
+                </select>
+                <select id="artists" @bind="ArtistId">
+                    <option value="0">All Artists</option>
+                    @if (_artists == null)
+                    {
+                        <option>Loading...</option>
+                    }
+                    else
+                    {
+                        @foreach (var artist in _artists)
+                        {
+                            <option value="@artist.Id">@artist.Name</option>
+                        }
+                    }
+                </select>                
+                <select id="rarities" @bind="RarityCode">
+                    <option value="all">All Rarities</option>
+                    @if (_rarities == null)
+                    {
+                        <option>Loading...</option>
+                    }
+                    else
+                    {
+                        @foreach (var rarity in _rarities)
+                        {
+                            <option value="@rarity.Code">@rarity.Name</option>
+                        }
+                    }
+                </select>
+                <input type="submit" value="Search" />
+            </form>
+        </div>
+        <div class="cards">
+            @if (_cards == null)
+            {
+                <p>@_message</p>
+            }
+            else
+            {
+                @foreach (var card in _cards)
+                {
+                    <div class="card" @onclick="() => AddCardToDeck(card.Id)" @onmouseover="@(async () => await getCardById(card.Id))">
+                        <img src="@card.OriginalImageUrl" alt="@card.Name" title="@card.Name" />
+                        <h2>@card.Name</h2>
+                    </div>
+                }
+            }
+        </div>
+
+        <nav aria-label="Page navigation example">
+            <ul class="pagination">
+                <li class="page-item @( _pageNumber == 1 ? "disabled" : "")">
+                    <a class="page-link" @onclick="() => ChangePage(_pageNumber - 1)">Previous</a>
+                </li>
+                @{
+                    var startPage = Math.Max(_pageNumber - 2, 1);
+                    var endPage = Math.Min(startPage + 4, _totalPages);
+                    for (var i = startPage; i <= endPage; i++)
+                    {
+                        var pageNumber = i; // Capture variable in a local scope to avoid modified closure
+                        <li class="page-item @(pageNumber == _pageNumber ? "active" : "")">
+                            <a class="page-link" @onclick="() => ChangePage(pageNumber)">@i</a>
+                        </li>
+                    }
+                }
+                <li class="page-item @( _pageNumber == _totalPages ? "disabled" : "")">
+                    <a class="page-link" @onclick="() => ChangePage(_pageNumber + 1)">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+
+    <div class="col right">
+        <div id="selected-cards">
+            <div id="header">
+                <div id="header-title">
+                    <h1>Decks</h1>
+                    <div id="deck-actions">
+                        <button type="button" id="clear" disabled="@(_selectedDeck == null || _selectedDeck.CardDecks.Count == 0)" @onclick="ClearDeck">Clear deck</button>
+                        <button type="button" id="add-deck" data-toggle="modal" data-target="#add-deck-modal">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-plus-circle-fill" viewBox="0 0 16 16">
+                                <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="select-deck">
+                    <select @bind="DeckId">
+                        <option value="0">Select a deck</option>
+                        @if (_decks == null)
+                        {
+                            <option>Loading...</option>
+                        }
+                        else
+                        {
+                            @foreach (var deck in _decks)
+                            {
+                                <option value="@deck.Id">@deck.Name</option>
+                            }
+                        }
+                    </select>
+                    <button @onclick="ShowDeckCards">Show deck cards</button>
+                </div>
+
+            </div>
+            <div id="cards">
+                @if (_selectedDeck == null || _selectedDeck.CardDecks == null || _deckCards == null || _selectedDeck.CardDecks.Count == 0)
+                {
+                    <p>No cards in deck</p>
+                }
+                else
+                {
+                    @if (_selectedDeck != null && _selectedDeck.CardDecks != null && _deckCards != null)
+                    {
+                        foreach (var card in _selectedDeck.CardDecks)
+                        {
+                            if (card != null)
+                            {
+                                var deckCard = _deckCards.FirstOrDefault(c => c.Id == card.Id);
+                                if (deckCard != null)
+                                {
+                                    <Components.DeckCard Count="@card.Amount" CardName="@deckCard.Name" disabledAdd="isAddDisabled" OnIncrement="@(async () => await AddCardToDeck(card.Id))" OnDecrement="@(async () => await RemoveCardFromDeck(card.Id))" />
+                                }
+                            }
+                        }
+                    }
+                }
+            </div>
+        </div>
+        <div class="card-detail">
+            @if (_selectedCard == null)
+            {
+                <p>No card selected</p>
+            }
+            else
+            {
+                <Components.CardDetails CardDescription="@_selectedCard.Description" CardName="@_selectedCard.Name" CardImageUrl="@_selectedCard.ImageUrl" CardType="@_selectedCard.Type" CardToughness="@_selectedCard.Toughness" CardPower="@_selectedCard.Power" />
+            }
+        </div>
+    </div>
+</div>
+
+<div class="modal" tabindex="-1" role="dialog" id="add-deck-modal" aria-labelledby="add-deck-modal-label" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add new deck</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form @onsubmit="AddDeck">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="deck-name">Deck name</label>
+                        <input type="text" class="form-control" id="deck-name" placeholder="Enter deck name" @bind="DeckName">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                    <input type="submit" class="btn btn-primary" value="Save changes">
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    #deck-actions #clear:disabled {
+        background-color: #cccccc;
+    }
+
+    #deck-actions #clear:disabled:hover {
+        background-color: #cccccc;
+    }
+
+    #deck-actions {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    #header-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    #add-deck {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: .5rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background-color: white;
+    }
+    #add-deck svg {
+        height: 1.5rem;
+    }
+    .col.right {
+        display: grid;
+        gap: 1rem;
+        grid-template-rows: calc(40vh - .5rem) calc(60vh - .5rem);
+    }
+    #builder-container {
+        width: 100%;
+        display: grid;
+        grid-template-columns: calc(70% - 1rem) calc(30% - 1rem);
+        gap: 2rem;
+    }
+
+    #builder-container #selected-cards {
+        display: flex;
+        flex-direction: column;
+        gap: .5rem;
+    }
+
+    #selected-cards #cards {
+        overflow-y: auto;
+        max-height: 50vh;
+        padding: 1rem;
+    }
+
+    #selected-cards .selected-card {
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        justify-content: space-between;
+        padding: .5rem 1rem;
+        background-color: white;
+        border-radius: 16px;
+        box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+}
+
+    #selected-cards .selected-card .counter {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+        border-radius: 8px;
+        padding: .5rem;
+    }
+
+    #selected-cards .selected-card button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: .5rem;
+        width: 2rem;
+        height: 2rem;
+        border: 1px solid #ccc;
+        border-radius: 100%;
+        aspect-ratio: 1/1;
+        background-color: white;
+    }
+
+    #selected-cards .selected-card button svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    #selected-cards .selected-card .card-details {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+    }
+
+    #cards-overview {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    #cards-overview .cards {
+        display: flex;
+        -ms-flex-wrap: wrap;
+        -webkit-flex-wrap: wrap;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 2rem 0;
+    }
+
+    #cards-overview .card {
+        margin: 0.5rem;
+        width: 15vw;
+        aspect-ratio: 3/4;
+        background-color: white;
+        border-radius: 16px;
+        box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    #cards-overview .card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 16px 16px 0 0;
+    }
+
+    #cards-overview .card h2 {
+        font-size: 1.2rem;
+        padding: 1rem;
+    }
+
+    #builder-options {
+        display: flex;
+        align-items: center;
+        box-shadow: 0 0 5px 0 rgba(0, 0, 0, 0.2);
+        border-radius: 16px;
+    }
+
+    #builder-options form {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        justify-content: center;
+        padding: 1rem;
+    }
+
+    input[type="text"], select {
+        padding: .5rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+    }
+
+    input[type="submit"], #selected-cards #header button {
+        padding: .5rem 1rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background-color: #007bff;
+        color: white;
+        height: max-content;
+    }
+
+    input[type="submit"]:hover, #selected-cards #header button:hover {
+        background-color: #0056b3;
+    }
+
+    button {
+        padding: .5rem;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        background-color: white;
+    }
+
+    #cards-overview .card:hover {
+        cursor: pointer;
+        transform: scale(1.05);
+        border: 2px solid red;
+    }
+
+    .pagination a {
+        cursor: pointer;
+    }
+
+    .pagination li.disabled a {
+        cursor: not-allowed;
+    }
+
+    .input-group {
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+        width: auto;
+    }
+
+    #selected-cards #header {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: .5rem;
+        margin-bottom: 1rem;
+    }
+
+    #selected-cards #header #select-deck {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+    }
+</style>

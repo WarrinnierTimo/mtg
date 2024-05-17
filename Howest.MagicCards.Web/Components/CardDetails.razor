@@ -1,0 +1,60 @@
+﻿@namespace Components
+
+<div class="card-details">
+    <div class="card-details-info">
+        <p>@CardName</p>
+        <p>@CardDescription</p>
+        <div id="card-properties">
+            <p>Type: @CardType</p>
+            <p>Power: @CardPower</p>
+            <p>Toughness: @CardToughness</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-details {
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        background-color: #f4f4f4;
+        transition: all 0.3s ease;
+    }
+
+        .card-details:hover {
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+    .card-details-info p {
+        margin: 15px 0;
+        color: #333;
+        font-size: 1.2em;
+    }
+
+    #card-properties p {
+        font-weight: bold;
+    }
+</style>
+
+@code {
+    [Parameter]
+    public string CardName { get; set; }
+
+    [Parameter]
+    public string CardDescription { get; set; }
+
+    [Parameter]
+    public string CardImageUrl { get; set; }
+
+    [Parameter]
+    public string CardType { get; set; }
+
+    [Parameter]
+    public string CardToughness { get; set; }
+
+    [Parameter]
+    public string CardPower { get; set; }
+}
